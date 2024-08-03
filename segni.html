@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Segni FM</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            text-align: center;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 800px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        .file-upload,
+        .url-input {
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        label {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        #result {
+            margin-top: 20px;
+            font-size: 18px;
+            white-space: pre-wrap;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Segni FM</h1>
+
+        <div class="selection">
+            <label><input type="radio" name="source" value="local" checked> Compare Local Files</label>
+            <label><input type="radio" name="source" value="online"> Compare Online Files</label>
+        </div>
+
+        <div class="file-upload">
+            <input type="file" id="file1" accept=".txt">
+            <label for="file1">Upload File 1</label>
+        </div>
+
+        <div class="file-upload">
+            <input type="file" id="file2" accept=".txt">
+            <label for="file2">Upload File 2</label>
+        </div>
+
+        <div class="url-input hidden">
+            <input type="text" id="url1" placeholder="Enter URL for File 1">
+            <input type="text" id="url2" placeholder="Enter URL for File 2">
+            <button id="fetch-files">Fetch Files from URLs</button>
+        </div>
+
+        <button id="compare">Compare Files</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // Toggle visibility of input fields based on the selected source
+        document.querySelector('input[name="source"]').addEventListener('change', function() {
+            const source = document.querySelector('input[name="source"]:checked').value;
+            if (source === 'local') {
+                document.querySelectorAll('.file-upload').forEach(el => el.style.display = 'block');
+                document.querySelector('.url-input').classList.add('hidden');
+            } else {
+                document.querySelectorAll('.file-upload').forEach(el => el.style.display = 'none');
+                document.querySelector('.url-input').classList.remove('hidden');
+            }
+        });
+
+        // Compare files when the "Compare Files" button is clicked
+        document.getElementById('compare').addEventListener('click', () => {
+            const source = document.querySelector('input[name="source"]:checked').value;
+
+            if (source === 'local') {
+                compareLocalFiles();
+            } else {
+                compareOnlineFiles();
+            }
+        });
+
+        // Fetch files from URLs when the "Fetch Files from URLs" button is clicked
+        document.getElementById('fetch-files').addEventListener('click', () => {
+            compareOnlineFiles();
+        });
+
+        // Read file content
+        function readFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsText(file);
+            });
+        }
+
+        // Fetch file content from URL
+        function fetchFile(url) {
+            return fetch(url)
+                .then(response => response.text())
+                .catch(err => Promise.reject(`Error fetching file: ${err}`));
+        }
+
+        // Parse text content into numbers
+        function parseNumbers(text) {
+            return text.trim().split('\n').map(line => line.split(',').map(num => parseFloat(num.trim()))).flat();
+        }
+
+        // Compare two arrays of numbers
+        function compareNumbers(numbers1, numbers2) {
+            const results = [];
+            const maxLength = Math.max(numbers1.length, numbers2.length);
+
+            for (let i = 0; i < maxLength; i++) {
+                const num1 = numbers1[i] || 0;
+                const num2 = numbers2[i] || 0;
+
+                const difference = num1 - num2;
+                const total = num1 + num2;
+
+                results.push({
+                    line: i + 1,
+                    file1Value: num1,    
+                    file2Value: num2,
+                    total,
+                    difference
+                });
+            }
+
+            return results;
+        }
+
+        // Display comparison results
+        function displayResult(results) {
+            const resultElement = document.getElementById('result');
+            let resultText = '';
+
+            results.forEach(result => {
+                resultText += `Line ${result.line}: File 1 Value: ${result.file1Value}, File 2 Value: ${result.file2Value}, Total: ${result.total}, Difference: ${result.difference}\n`;
+            });
+
+            resultElement.textContent = resultText;
+        }
+
+        // Compare local files
+        function compareLocalFiles() {
+            const file1Input = document.getElementById('file1');
+            const file2Input = document.getElementById('file2');
+
+            const file1 = file1Input.files[0];
+            const file2 = file2Input.files[0];
+
+            if (!file1 || !file2) {
+                alert('Please upload both files.');
+                return;
+            }
+
+            const file1Promise = readFile(file1);
+            const file2Promise = readFile(file2);
+
+            Promise.all([file1Promise, file2Promise])
+                .then(([data1, data2]) => {
+                    const numbers1 = parseNumbers(data1);
+                    const numbers2 = parseNumbers(data2);
+
+                    const comparisonResult = compareNumbers(numbers1, numbers2);
+                    displayResult(comparisonResult);
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('An error occurred while processing the files.');
+                });
+        }
+
+        // Compare online files
+        function compareOnlineFiles() {
+            const url1 = document.getElementById('url1').value.trim();
+            const url2 = document.getElementById('url2').value.trim();
+
+            if (!url1 || !url2) {
+                alert('Please enter URLs for both files.');
+                return;
+            }
+
+            const url1Promise = fetchFile(url1);
+            const url2Promise = fetchFile(url2);
+
+            Promise.all([url1Promise, url2Promise])
+                .then(([data1, data2]) => {
+                    const numbers1 = parseNumbers(data1);
+                    const numbers2 = parseNumbers(data2);
+
+                    const comparisonResult = compareNumbers(numbers1, numbers2);
+                    displayResult(comparisonResult);
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('An error occurred while fetching the files.');
+                });
+        }
+    </script>
+</body>
+</html>
